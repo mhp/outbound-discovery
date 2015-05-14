@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE rfc SYSTEM "rfc2629.dtd">
+<?rfc compact="yes" ?> <!-- Conserve vertical whitespace -->
+<?rfc strict="no" ?>
+<?rfc toc="yes" ?>
+<?rfc symrefs="yes" ?>
+<rfc category="info" ipr="trust200902"
+docName="draft-procter-dispatch-outbound-discovery-01">
+
+    <front>
+        <title abbrev="Discovering outbound proxies">
+			Automatic discovery of RFC 5626 Edge Proxies
+        </title>
+        <author initials="M." surname="Procter"
+                fullname="Michael Procter">
+            <organization>VoIP.co.uk</organization>
+            <address>
+                <postal>
+                    <street>St Edburg's Hall</street>
+                    <street>Priory Road</street>
+                    <city>Bicester</city>
+                    <region>Oxfordshire</region>
+                    <code>OX26 6BL</code>
+                    <country>UK</country>
+                </postal>
+                <email>michael@voip.co.uk</email>
+                <uri>http://www.voip.co.uk</uri>
+            </address>
+        </author>
+
+        <date day="05" month="September" year="2014"/>
+
+        <workgroup>DISPATCH</workgroup>
+
+        <abstract><t>
+
+<xref target="RFC5626"/> (commonly known as 'SIP outbound') defines
+mechanisms that permit SIP (Session Initiation Protocol) UAs (User
+Agents) to maintain multiple connections to a registrar or proxy via
+multiple Edge Proxies, known as the outbound-proxy-set.  Discovering
+the URIs that make up the outbound-proxy-set is left to configuration
+or future discovery mechanisms.
+This draft defines a simple discovery mechanism that enables UAs to
+discover the URIs of all the Edge Proxies in the outbound-proxy-set
+without requiring additional configuration on the UA.
+
+</t></abstract>
+    </front>
+
+<middle>
+<section title="Introduction">
+<t>
+Reliably maintaining connectivity between a SIP UA and a registrar
+across the Internet, in the presence of NATs, routing changes,
+and maintenance of intervening equipment is made more straightforward
+by <xref target="RFC5626"/>.  The mechanisms in that specification allow
+multiple connections over diverse routes, equipment, and data centres,
+which permit a more robust SIP service to be created.
+</t>
+<t>
+However, one of the hurdles that is preventing wide-spread use of these
+mechanisms is discovering the outbound-proxy-set, the list of suitable
+edge proxies that a UA may use for multiple connections.  Some UAs
+permit this set to be configured, but the large number of options
+available on many UAs means that configuration for robustness is often
+overlooked once basic operation is possible.
+</t>
+<t>
+This draft describes a simple mechanism by which a UA supporting
+<xref target="RFC5626"/> may
+determine the outbound-proxy-set from the DNS.
+</t>
+</section>
+
+<section title="User Agent Behaviour">
+<section title="Determining the outbound-proxy-set">
+<t>The UA, preparing to register with a domain, gathers all edge
+proxies named in the DNS SRV records associated with that domain, and
+uses them to populate the outbound-proxy-set.  
+</t>
+<t>The DNS SRV lookup will result in a set of targets and ports, along
+with weights and priorities.  For the purpose of determining the
+outbound-proxy-set, the weights and priorities are discarded.  The
+targets and ports are transformed into URIs by combining them with the
+scheme and protocol used in the the SRV query.
+</t>
+<t>TODO: We could use the SRV weights and priorities to map to q-values
+on the registered contacts, but I'm not convinced mapping inbound and
+outbound preferences together like this is necessarily helpful.
+</t>
+<figure>
+<preamble>
+For example, a DNS SRV query for '_sip._tcp.example.net' might result in the responses:
+</preamble>
+<artwork>
+    SRV 0 5 5060 edge-01.example.net.
+    SRV 0 5 5060 edge-02.example.net.
+    SRV 5 0 5060 edge-fallback.example.net.
+</artwork>
+</figure>
+<figure>
+<preamble>
+These should be mapped to the following URIs, which will now form the
+outbound-proxy-set:
+</preamble>
+<artwork>
+    sip:edge-01.example.net:5060;transport=tcp
+    sip:edge-02.example.net:5060;transport=tcp
+    sip:edge-fallback.example.net:5060;transport=tcp
+</artwork>
+</figure>
+<t>TODO: omit port if it is default for transport?  Need to specify at
+least one of port and transport to prevent another round of NAPTR
+lookups when the o-p-s is used for loose routing to the Edge Proxy.
+</t>
+<t>
+Following the construction of the outbound-proxy-set, the procedures in
+<xref target="RFC5626"/> section 4.2 may be followed to generate the
+initial registration via one of the proxies in the outbound-proxy-set.
+</t>
+<t>
+Provided the initial registration is successful, and the registrar
+supports <xref target="RFC5626"/> (as
+indicated by the presence of the outbound option-tag in the Require
+header field of a successful registration response), the UA can then
+create additional registrations to as many of the remaining proxies in
+the outbound-proxy-set as are supported.
+</t>
+<t>
+If the initial registration is successful, but the registrar does not
+support <xref target="RFC5626"/>, then the UA cannot establish
+subsequent registrations.
+</t>
+<t>
+If the initial registration is unsuccessful for reasons of edge proxy
+failure or transaction timeout, then the UA may repeat the initial
+registration but with a different outbound proxy selected from the
+outbound-proxy-set.
+</t>
+</section>
+<section title="Maintaining the outbound-proxy-set">
+<t>Since the outbound-proxy-set is now determined dynamically, rather
+than through static configuration, care should be taken to respect the
+relevant DNS TTL values and ensure that when the DNS
+records change, the configuration of the outbound-proxy-set and the 
+number and destinations of registrations are updated accordingly.
+</t>
+</section>
+</section>
+
+<section title="Registrar considerations">
+<t>There are no changes needed for the correct operation of Registrars.
+</t>
+<t>If the system uses SRV-based load-balancing, and has a
+low-priority SRV record pointing to an edge proxy that is normally only
+used under fault conditions (sometimes known as a 'canary' proxy), then
+a UA using the approach described in this document might maintain
+registrations via this canary proxy which might be considered unexpected.
+Such a system should not treat registration traffic via the canary proxy
+as indicative of a fault condition.
+</t>
+</section>
+
+<section title="Edge Proxy considerations">
+<t>There are no changes needed for the correct operation of Edge Proxies.
+</t>
+</section>
+
+<section title="Security Considerations">
+<t>
+TODO
+</t>
+</section>
+
+<section title="IANA Considerations">
+<t>
+This document has no IANA actions.
+</t>
+</section>
+
+<section title="Acknowledgements">
+<t>
+The author thanks 
+Dale Worley and Paul Kyzivat
+for their thoughtful comments and feedback.
+</t>
+</section>
+
+</middle>
+<back>
+    <references title="Normative References">
+        <?rfc include='reference.RFC.5626'?>
+    </references>
+    <!--<references title="Informative References">
+    </references> -->
+</back>
+</rfc>
+<!-- vim:set ts=4 et tw=72:  -->
