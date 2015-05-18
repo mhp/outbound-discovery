@@ -1,0 +1,196 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE rfc SYSTEM "rfc2629.dtd">
+<?rfc compact="yes" ?> <!-- Conserve vertical whitespace -->
+<?rfc strict="no" ?>
+<?rfc toc="yes" ?>
+<?rfc symrefs="yes" ?>
+<rfc category="info" ipr="trust200902"
+docName="draft-procter-dispatch-outbound-unaptr-01">
+
+    <front>
+        <title abbrev="Discovering outbound proxies">
+			Automatic discovery of RFC 5626 Edge Proxies using U-NAPTR
+        </title>
+        <author initials="M." surname="Procter"
+                fullname="Michael Procter">
+            <address>
+                <email>michael.ietf@gmail.com</email>
+            </address>
+        </author>
+
+        <author fullname="Olle E. Johansson" initials="O. E"
+                surname="Johansson">
+          <organization>Edvina AB</organization>
+
+          <address>
+            <postal>
+              <street>Runbov&auml;gen 10</street>
+
+              <city>Sollentuna</city>
+
+              <code>SE-192 48</code>
+
+              <country>SE</country>
+            </postal>
+
+            <email>oej@edvina.net</email>
+          </address>
+        </author>
+
+        <date day="18" month="May" year="2015"/>
+
+        <workgroup>DISPATCH</workgroup>
+
+        <abstract><t>
+
+<xref target="RFC5626"/> (commonly known as 'SIP outbound') defines
+mechanisms that permit SIP (Session Initiation Protocol) UAs (User
+Agents) to maintain multiple connections to a registrar or proxy via
+multiple Edge Proxies, known as the outbound-proxy-set.  Discovering
+the URIs that make up the outbound-proxy-set is left to configuration
+or future discovery mechanisms.
+</t>
+<t>
+This draft defines a simple discovery mechanism based on U-NAPTR
+<xref target="RFC4848"/> that enables UAs to discover the URIs of all the 
+Edge Proxies in the outbound-proxy-set without requiring additional 
+configuration on the UA.
+
+</t></abstract>
+    </front>
+
+<middle>
+<section title="Introduction">
+<t>
+Reliably maintaining connectivity between a SIP UA and a registrar
+across the Internet, in the presence of NATs, routing changes,
+and maintenance of intervening equipment is made more straightforward
+by <xref target="RFC5626"/>.  The mechanisms in that specification allow
+multiple connections over diverse routes, equipment, and data centres,
+which permit a more robust SIP service to be created.
+</t>
+<t>
+However, one of the hurdles that is preventing wide-spread use of these
+mechanisms is discovering the outbound-proxy-set, the list of suitable
+edge proxies that a UA may use for multiple connections.  Some UAs
+permit this set to be configured, but the large number of options
+available on many UAs means that configuration for robustness is often
+overlooked once basic operation is possible.
+</t>
+<t>
+This draft describes a simple mechanism by which a UA may 
+determine the outbound-proxy-set from the DNS.  The choice of U-NAPTR
+<xref target="RFC4848"/> is driven by the desire to directly discover
+URIs to use as outbound proxies, yet also minimise the complexity of the
+solution by not requiring the regular expression processing associated
+with a full NAPTR implementation.
+</t>
+</section>
+
+<section title="User Agent Behaviour" anchor="usage">
+<section title="Determining the outbound-proxy-set">
+<t>When a UA wishes to determine the outbound-proxy-set for a particular
+domain (the domain against which it wishes to register), it 
+submits a DNS NAPTR query for that domain.
+</t>
+<figure>
+<preamble>
+For example, when registering against 'sip:example.net', the UA would
+submit a DNS NAPTR query for "example.net", and might receive a response
+contains answers such as:
+</preamble>
+<artwork>
+   NAPTR 100 10 "u" "SIPOUTBOUND" "!^.*$!sips:lon.example.net!" ""
+   NAPTR 100 10 "u" "SIPOUTBOUND" "!^.*$!sips:nyc.example.net!" ""
+   NAPTR 100 20 "u" "SIPOUTBOUND" "!^.*$!sips:cph.example.net!" ""
+   NAPTR 100 30 "u" "SIPOUTBOUND" "!^.*$!sips:sfo.example.net!" ""
+   NAPTR  90 50 "s" "SIP+D2T"     ""  _sip._tcp.example.net.
+   NAPTR 100 50 "s" "SIP+D2U"     ""  _sip._udp.example.net.
+
+</artwork>
+</figure>
+<t>
+In this example, four SIP URIs with an application service tag of
+"SIPOUTBOUND" are provided with the same order and varying preference
+values.  A UA may use as many of these as it supports in preference order
+as the outbound-proxy-set.  <xref target="RFC5626"/> requires UAs to
+support at least two and preferably up to four outbound-proxies.
+</t>
+<t>TODO: should we use both application service and protocol tags,
+e.g. "OUTBOUND:sip" &amp; "OUTBOUND:sips", or just a service tag as shown?
+</t>
+<t>TODO: Is it worth noting we can only use answers with the same order
+value?  rfc3403 is very clear that you can't consider answers with
+different orders.
+</t>
+
+<t>
+Following the construction of the outbound-proxy-set, the procedures in
+<xref target="RFC5626"/> section 4 may be followed.
+</t>
+</section>
+<section title="Maintaining the outbound-proxy-set">
+<t>Since the outbound-proxy-set is now determined dynamically, rather
+than through static configuration, care should be taken to respect the
+relevant DNS TTL values and ensure that when the DNS
+records change, the configuration of the outbound-proxy-set and the 
+number and destinations of registrations are updated accordingly.
+</t>
+<t>If the outbound-proxy-set is refreshed and no changes are found, then
+the UA continues to use the flows it has already established.  If it has
+a flow to a proxy that is no longer present in the outbound-proxy-set,
+it should take steps to remove that flow.  Similarly, if additional proxies
+are now available, the UA may choose to establish flows to these proxies.
+</t>
+</section>
+</section>
+
+<!--section title="Acknowledgements">
+<t>
+</t>
+</section-->
+
+<section title="Security Considerations" anchor="sec_cons">
+<t>
+TODO
+</t>
+</section>
+
+<section title="IANA Considerations">
+<t>
+   This section contains the registration information for one U-NAPTR
+   application service tag
+<!-- and two U-NAPTR application protocol tags -->
+   (in accordance with <xref target="RFC4848"/>).
+</t>
+
+<section title="SIP-Outbound Application Service Tag Registration">
+<t>
+   Application Protocol Tag: SIPOUTBOUND
+</t>
+<t>
+   Intended usage: See <xref target="usage"/>.
+</t>
+<t>
+   Interoperability considerations: N/A
+</t>
+<t>
+   Security considerations: See <xref target="sec_cons"/>.
+</t>
+<t>
+   Relevant related publications: <xref target="RFC5626"/>.
+</t>
+</section>
+</section>
+
+</middle>
+<back>
+    <references title="Normative References">
+        <?rfc include='reference.RFC.5626'?>
+        <?rfc include='reference.RFC.4848'?>
+    </references>
+    <!--<references title="Informative References">
+    </references> -->
+</back>
+</rfc>
+<!-- vim:set ts=4 et tw=72:  -->
